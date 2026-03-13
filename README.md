@@ -1,61 +1,61 @@
-# Chat distribuido (Grupo 1)
+# Chat Distribuido 🗨️
 
-API en **Python + FastAPI** para un chat centralizado tipo “servidor de sala”.
+API REST para un sistema de chat centralizado desarrollado con FastAPI y MySQL.
 
-## Requisitos (según entrega)
-- **POST `/usuarios`**
-- **GET `/usuarios`**
-- **POST `/mensajes`**
-- **GET `/mensajes`**
-
-Incluye también:
-- **GET `/usuarios/{id}`**
-- **GET `/mensajes/{id_usuario}`**
+## Requisitos
+- Python 3.12+
+- Docker Desktop
 
 ## Configuración
-La conexión a MySQL se configura en `database.py` (por defecto):
-- host: `localhost`
-- port: `3380`
-- user: `user`
-- password: `123`
-- db: `chat_db`
 
-## Instalación
-
+### 1. Clonar el repositorio
 ```bash
-python -m venv venv
+git clone https://github.com/Programacion-DIstribuida-2026/chat_distribuido.git
+cd chat_distribuido
+```
+
+### 2. Levantar la base de datos con Docker
+```bash
+sudo docker run --name chat_mysql \
+  -e MYSQL_ROOT_PASSWORD=123 \
+  -e MYSQL_DATABASE=chat_db \
+  -e MYSQL_USER=user \
+  -e MYSQL_PASSWORD=123 \
+  -p 3380:3306 \
+  -d mysql:8.0
+```
+
+### 3. Crear y activar el entorno virtual
+```bash
+python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
 ```
 
-## Ejecución
-
+### 4. Instalar dependencias
 ```bash
-uvicorn main:app --reload
+pip install fastapi uvicorn aiomysql cryptography
 ```
 
-Al iniciar, la app crea las tablas `usuarios` y `mensajes` si no existen.
-
-## Evidencia rápida (ejemplos)
-
-Crear usuario:
-
+### 5. Correr la API
 ```bash
-curl -X POST "http://127.0.0.1:8000/usuarios" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"nombre\":\"Kevin\"}"
+uvicorn main:app --port 9000 --reload
 ```
 
-Enviar mensaje:
+### 6. Documentación
+Abre en tu navegador: http://127.0.0.1:9000/docs
 
-```bash
-curl -X POST "http://127.0.0.1:8000/mensajes" ^
-  -H "Content-Type: application/json" ^
-  -d "{\"id_usuario\":1,\"contenido\":\"Hola\"}"
-```
+## Endpoints
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | /usuarios | Crear usuario |
+| GET | /usuarios | Listar usuarios |
+| GET | /usuarios/{id} | Obtener usuario por ID |
+| POST | /mensajes | Enviar mensaje |
+| GET | /mensajes | Ver historial completo |
+| GET | /mensajes/{id_usuario} | Ver mensajes por usuario |
 
-Listar mensajes:
-
-```bash
-curl "http://127.0.0.1:8000/mensajes"
-```
+## Tecnologías
+- FastAPI
+- aiomysql
+- MySQL 8.0 (Docker)
+- Python 3.12
