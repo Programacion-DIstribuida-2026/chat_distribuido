@@ -6,9 +6,10 @@ async def crear_usuario(nombre: str):
     query = "INSERT INTO usuarios (nombre) VALUES (%s)"
     await cursor.execute(query, (nombre,))
     await conn.commit()
+    new_id = cursor.lastrowid
     await cursor.close()
     conn.close()
-    return {"message": "Usuario creado correctamente"}
+    return {"id": new_id, "message": "Usuario creado correctamente"}
 
 async def listar_usuarios():
     conn = await get_connection()

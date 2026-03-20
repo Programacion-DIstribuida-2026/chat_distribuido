@@ -1,11 +1,12 @@
+import os
 import aiomysql
 
 DB_CONFIG = {
-    "host": "localhost",
-    "port": 3380,
-    "user": "user",
-    "password": "123",
-    "db": "chat_db"
+    "host": os.getenv("DB_HOST", "localhost"),
+    "port": int(os.getenv("DB_PORT", "3380")),
+    "user": os.getenv("DB_USER", "user"),
+    "password": os.getenv("DB_PASSWORD", "123"),
+    "db": os.getenv("DB_NAME", "chat_db"),
 }
 
 async def get_connection():

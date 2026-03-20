@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chat — dos personas</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --panel: #1a2332;
+      --text: #e7ecf3;
+      --muted: #8b98a5;
+      --accent: #1d9bf0;
+      --border: #38444d;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 1.5rem;
+    }
+    h1 { font-size: 1.25rem; font-weight: 600; margin: 0 0 0.5rem; }
+    .hint { color: var(--muted); font-size: 0.85rem; max-width: 36rem; margin-bottom: 1rem; line-height: 1.45; }
+    .card {
+      width: 100%;
+      max-width: 36rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem;
+    }
+    label { display: block; font-size: 0.75rem; color: var(--muted); margin-bottom: 0.25rem; }
+    input {
+      width: 100%;
+      padding: 0.5rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--text);
+      margin-bottom: 0.75rem;
+    }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+    @media (max-width: 520px) { .row { grid-template-columns: 1fr; } }
+    button {
+      padding: 0.55rem 1rem;
+      border-radius: 8px;
+      border: none;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--accent);
+      color: #fff;
+    }
+    button:disabled { opacity: 0.45; cursor: not-allowed; }
+    button.secondary { background: transparent; border: 1px solid var(--border); color: var(--text); }
+    .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.25rem; }
+    #log {
+      margin-top: 1rem;
+      height: min(50vh, 320px);
+      overflow-y: auto;
+      padding: 0.75rem;
+      background: var(--bg);
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+    .msg { margin-bottom: 0.35rem; word-break: break-word; }
+    .msg.me { color: var(--accent); }
+    .msg.sys { color: var(--muted); font-size: 0.8rem; }
+    .send-row { display: flex; gap: 0.5rem; margin-top: 0.75rem; }
+    .send-row input { margin-bottom: 0; flex: 1; }
+    .status { font-size: 0.8rem; color: var(--muted); margin-top: 0.5rem; }
+    .status.ok { color: #00ba7c; }
+    .status.err { color: #f4212e; }
+  </style>
+</head>
+<body>
+  <h1>Chat en tiempo real</h1>
+  <p class="hint">
+    Cada persona usa <strong>su propio ID</strong> en “Mi ID” y el <strong>ID del otro</strong> en “Compañero”.
+    Ejemplo: Ana (id 1) pone 1 y 2; Beto (id 2) pone 2 y 1. Crea usuarios en <code>/docs</code> (POST /usuarios) y revisa IDs con GET /usuarios.
+  </p>
+  <p class="hint">
+    <strong>Otro dispositivo en tu red:</strong> no uses <code>127.0.0.1</code> en su navegador (eso es “su propio equipo”). La otra persona debe entrar con la <strong>IP local de quien ejecuta el servidor</strong>, por ejemplo <code>http://192.168.0.15:9000/chat</code> (la IP la ves con <code>ip a</code>, <code>hostname -I</code> o en Windows <code>ipconfig</code>). El servidor debe arrancar con <code>uvicorn ... --host 0.0.0.0</code> y el firewall debe permitir el puerto 9000.
+  </p>
+  <div class="card">
+    <label for="serverHost">Servidor del chat (host:puerto)</label>
+    <input id="serverHost" type="text" placeholder="vacío = usar esta misma página (ej. 192.168.0.15:9000 si no abriste desde esa IP)" autocomplete="off" />
+    <div class="row">
+      <div>
+        <label for="myId">Mi ID (usuario)</label>
+        <input id="myId" type="number" min="1" placeholder="1" />
+      </div>
+      <div>
+        <label for="peerId">ID del compañero</label>
+        <input id="peerId" type="number" min="1" placeholder="2" />
+      </div>
+    </div>
+    <div class="actions">
+      <button type="button" id="btnConnect">Conectar</button>
+      <button type="button" id="btnDisconnect" class="secondary" disabled>Desconectar</button>
+    </div>
+    <div id="status" class="status">Desconectado</div>
+    <div id="log" aria-live="polite"></div>
+    <div class="send-row">
+      <input id="message" type="text" placeholder="Escribe un mensaje…" autocomplete="off" disabled />
+      <button type="button" id="btnSend" disabled>Enviar</button>
+    </div>
+  </div>
+  <script>
+    const myId = document.getElementById('myId');
+    const peerId = document.getElementById('peerId');
+    const log = document.getElementById('log');
+    const statusEl = document.getElementById('status');
+    const message = document.getElementById('message');
+    const btnConnect = document.getElementById('btnConnect');
+    const btnDisconnect = document.getElementById('btnDisconnect');
+    const btnSend = document.getElementById('btnSend');
+    const serverHost = document.getElementById('serverHost');
+
+    let ws = null;
+
+    /** Host:puerto del API/WebSocket; si el campo está vacío, el de la barra de direcciones. */
+    function resolveServerAuthority() {
+      const raw = serverHost.value.trim();
+      if (!raw) return location.host;
+      let s = raw.replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+      if (!s.includes(':')) s += ':9000';
+      return s;
+    }
+
+    function setStatus(text, cls) {
+      statusEl.textContent = text;
+      statusEl.className = 'status' + (cls ? ' ' + cls : '');
+    }
+
+    function appendLine(text, kind) {
+      const div = document.createElement('div');
+      div.className = 'msg' + (kind ? ' ' + kind : '');
+      div.textContent = text;
+      log.appendChild(div);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function wsUrl() {
+      const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const a = parseInt(String(myId.value), 10);
+      const b = parseInt(String(peerId.value), 10);
+      return `${proto}//${resolveServerAuthority()}/ws/chat/${a}/${b}`;
+    }
+
+    btnConnect.addEventListener('click', () => {
+      const a = parseInt(String(myId.value), 10);
+      const b = parseInt(String(peerId.value), 10);
+      if (!a || !b) {
+        setStatus('Indica Mi ID y ID del compañero (números válidos).', 'err');
+        return;
+      }
+      if (a === b) {
+        setStatus('Mi ID y compañero no pueden ser el mismo.', 'err');
+        return;
+      }
+      if (ws) ws.close();
+
+      ws = new WebSocket(wsUrl());
+      setStatus('Conectando…');
+
+      ws.onopen = () => {
+        setStatus('Conectado — ' + wsUrl().replace(/^wss?:\/\//, ''), 'ok');
+        btnConnect.disabled = true;
+        btnDisconnect.disabled = false;
+        message.disabled = false;
+        btnSend.disabled = false;
+        appendLine('Sesión abierta.', 'sys');
+      };
+
+      ws.onmessage = (ev) => {
+        const data = String(ev.data);
+        if (data === 'enviado') {
+          appendLine('Enviado ✓', 'sys');
+          return;
+        }
+        appendLine(data);
+      };
+
+      ws.onerror = () => setStatus('Error de conexión WebSocket.', 'err');
+
+      ws.onclose = () => {
+        setStatus('Desconectado');
+        btnConnect.disabled = false;
+        btnDisconnect.disabled = true;
+        message.disabled = true;
+        btnSend.disabled = true;
+        ws = null;
+        appendLine('Sesión cerrada.', 'sys');
+      };
+    });
+
+    btnDisconnect.addEventListener('click', () => {
+      if (ws) ws.close();
+    });
+
+    function send() {
+      const text = message.value.trim();
+      if (!text || !ws || ws.readyState !== WebSocket.OPEN) return;
+      appendLine('Tú: ' + text, 'me');
+      ws.send(text);
+      message.value = '';
+      message.focus();
+    }
+
+    btnSend.addEventListener('click', send);
+    message.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') send();
+    });
+  </script>
+</body>
+</html>

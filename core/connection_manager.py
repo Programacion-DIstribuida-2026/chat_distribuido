@@ -10,7 +10,7 @@ class ConnectionManager:
         if user_id in self.active_connections:
             try:
                 await self.active_connections[user_id].close()
-            except:
+            except Exception:
                 pass
 
         self.active_connections[user_id] = websocket
@@ -27,7 +27,7 @@ class ConnectionManager:
         if websocket:
             try:
                 await websocket.send_text(message)
-            except:
+            except Exception:
                 self.disconnect(user_id)
 
     async def broadcast(self, message: str):
@@ -36,7 +36,7 @@ class ConnectionManager:
         for user_id, websocket in self.active_connections.items():
             try:
                 await websocket.send_text(message)
-            except:
+            except Exception:
                 disconnected_users.append(user_id)
 
         for user_id in disconnected_users:
