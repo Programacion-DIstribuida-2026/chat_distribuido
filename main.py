@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from database import create_tables
-from routes import usuarios, mensajes
+from routes import usuarios, mensajes, chat_ws_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -12,6 +12,7 @@ app = FastAPI(title="Chat Distribuido", lifespan=lifespan)
 
 app.include_router(usuarios.router)
 app.include_router(mensajes.router)
+app.include_router(chat_ws_router.router)
 
 @app.get("/")
 async def root():

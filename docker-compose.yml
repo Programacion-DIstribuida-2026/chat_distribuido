@@ -1,0 +1,38 @@
+version: '3.9'
+
+services:
+  db:
+    image: mysql:8.0
+    container_name: chat_mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: 123
+      MYSQL_DATABASE: chat_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: 123
+    ports:
+      - '3380:3306'
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - chat_network
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: chat_phpmyadmin
+    restart: always
+    depends_on:
+      - db
+    environment:
+      PMA_HOST: db
+      PMA_PORT: 3306
+    ports:
+      - '8080:80'
+    networks:
+      - chat_network
+
+volumes:
+  mysql_data:
+
+networks:
+  chat_network:
