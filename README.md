@@ -102,6 +102,10 @@ netsh interface portproxy delete v4tov4 listenport=9000 listenaddress=0.0.0.0
 | La página carga pero el chat no conecta | En “Servidor del chat” pon `IP_DE_WINDOWS:9000`; ambos deben tener **Conectar** con IDs cruzados |
 | Error al enviar / base de datos | MySQL en marcha (`docker compose up -d db`) y variables `DB_*` si no usas el puerto 3380 por defecto |
 
+
+### Una demostracion como funciona 
+<img width="1919" height="1079" alt="image" src="https://github.com/user-attachments/assets/c38776b2-5584-4941-93c0-d219fb0e5642" />
+
 ## Endpoints principales
 
 | Método | Ruta | Descripción |
