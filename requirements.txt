@@ -1,4 +1,7 @@
-aiomysql
 fastapi
 uvicorn[standard]
 websockets
+motor
+pymongo
+aiomysql
+cryptography
