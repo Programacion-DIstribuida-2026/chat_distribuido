@@ -7,12 +7,13 @@ from dotenv import load_dotenv
 load_dotenv(Path(__file__).resolve().parent / ".env")
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 
 from core.realtime_listener import start_redis_listener_task, stop_redis_listener_task
 from core.redis_client import connect_redis, disconnect_redis, ping_redis
 from database import create_tables, mongo_ping
-from routes import chat_ws_router, grupos, mensajes, realtime_ws, usuarios
+from routes import auth, chat_ws_router, grupos, mensajes, realtime_ws, usuarios
 
 
 @asynccontextmanager
@@ -33,6 +34,19 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+_cors = os.environ.get("CORS_ORIGINS", "").strip()
+if _cors:
+    _origins = [o.strip() for o in _cors.split(",") if o.strip()]
+    if _origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
+
+app.include_router(auth.router)
 app.include_router(usuarios.router)
 app.include_router(grupos.router)
 app.include_router(mensajes.router)

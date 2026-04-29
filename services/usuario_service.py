@@ -1,6 +1,16 @@
+from typing import Any
+
 from bson import ObjectId
 
 from database import db
+
+
+def usuario_publico(doc: dict[str, Any]) -> dict[str, Any]:
+    """Documento Mongo listo para JSON sin campos sensibles."""
+    out = dict(doc)
+    out.pop("password_hash", None)
+    out["_id"] = str(out["_id"])
+    return out
 
 
 async def crear_usuario(nombre: str):
@@ -12,8 +22,7 @@ async def crear_usuario(nombre: str):
 async def listar_usuarios():
     usuarios = []
     async for user in db.usuarios.find():
-        user["_id"] = str(user["_id"])
-        usuarios.append(user)
+        usuarios.append(usuario_publico(user))
     return usuarios
 
 
@@ -21,8 +30,8 @@ async def obtener_usuario(id: str):
     try:
         usuario = await db.usuarios.find_one({"_id": ObjectId(id)})
         if usuario:
-            usuario["_id"] = str(usuario["_id"])
-        return usuario
+            return usuario_publico(usuario)
+        return None
     except Exception:
         return None
 

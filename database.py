@@ -47,5 +47,22 @@ async def create_tables():
             [("grupo_id", 1), ("usuario_id", 1)], unique=True
         )
         await db.grupo_miembros.create_index([("usuario_id", 1)])
+        await db.usuarios.create_index(
+            "email",
+            unique=True,
+            partialFilterExpression={"email": {"$exists": True, "$type": "string"}},
+        )
+        await db.usuarios.create_index(
+            "username",
+            unique=True,
+            partialFilterExpression={"username": {"$exists": True, "$type": "string"}},
+        )
+        await db.usuarios.create_index(
+            "telefono_e164",
+            unique=True,
+            partialFilterExpression={
+                "telefono_e164": {"$exists": True, "$type": "string"}
+            },
+        )
     except Exception as e:
         print(f" Aviso: índices: {e}")

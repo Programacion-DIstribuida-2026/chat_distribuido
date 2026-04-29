@@ -12,7 +12,7 @@ Documentación alineada con el código (FastAPI). La referencia canónica intera
 | Aspecto | Detalle |
 |---------|---------|
 | Content-Type | `application/json` en cuerpos de petición y respuestas JSON. |
-| Errores | `422` validación (Pydantic o reglas de negocio); `404` recurso no encontrado. |
+| Errores | `401` credenciales inválidas; `404` recurso no encontrado; `409` conflicto (p. ej. registro duplicado); `422` validación; `503` servicio no configurado (p. ej. `JWT_SECRET`). |
 | Paginación de listas de mensajes | Respuesta envuelta: `items`, `next_before_id`, `limit`. Repite la petición pasando `before_id=<next_before_id>` para la página siguiente (mensajes más antiguos). |
 
 ---
@@ -27,11 +27,26 @@ Documentación alineada con el código (FastAPI). La referencia canónica intera
 
 ---
 
+## Auth (registro e inicio de sesión)
+
+Requieren `JWT_SECRET` en el entorno (mínimo 16 caracteres). El token es **JWT** HS256; `sub` = ObjectId del usuario (mismo id que el resto de la API).
+
+| Método | Ruta | Cuerpo | Respuesta |
+|--------|------|--------|------------|
+| POST | `/auth/register` | `nombre`, `username` (solo letras, números, `_`), `email`, `codigo_pais` (ej. `+57`), `numero` (dígitos; se normaliza a E.164), `password` (8–72 caracteres) | `201`: `access_token`, `token_type` (`bearer`), `user`: `{ id, nombre, username, email, telefono_e164 }`. |
+| POST | `/auth/login` | `email`, `password` | `200`: mismo envelope que registro. |
+
+Errores: `409` correo, usuario o teléfono ya usados; `422` datos inválidos (teléfono, formato, etc.); `401` login fallido.
+
+CORS: si defines `CORS_ORIGINS` (URLs separadas por coma) en el servidor, se permiten esos orígenes en navegador.
+
+---
+
 ## Usuarios
 
 | Método | Ruta | Cuerpo / parámetros | Respuesta |
 |--------|------|---------------------|-----------|
-| POST | `/usuarios` | `{"nombre": "..."}` | `200`: `{"id","nombre"}`. |
+| POST | `/usuarios` | `{"nombre": "..."}` | `200`: `{"id","nombre"}`. Útil en desarrollo; el flujo del mockup usa **`/auth/register`**. |
 | GET | `/usuarios` | — | Lista de documentos con `_id` string. |
 | GET | `/usuarios/{id}` | `id` ObjectId | Documento usuario o `404`. |
 | PATCH | `/usuarios/{id}` | `{"nombre": "..."}` | Usuario actualizado o `404`. |

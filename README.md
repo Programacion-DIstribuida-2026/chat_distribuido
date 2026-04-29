@@ -29,6 +29,9 @@ Copia `.env.example` a `.env` y ajusta URLs si tu red es distinta:
 | `MONGO_HOST_PORT` | Solo para **Docker Compose**: puerto en el host donde se publica Mongo (default **37117**). Si al hacer `docker compose up` aparece error al publicar el puerto, cámbialo (p. ej. `47117`) y alinea `MONGO_URL`. |
 | `MONGO_DB_NAME` | Nombre de la base (default `chat_db`). La suite de tests usa `chat_test` vía `tests/conftest.py`. |
 | `REDIS_URL` | URI de Redis (p. ej. `redis://127.0.0.1:6379/0`). Si no se define, la app arranca sin cliente Redis y `/health` mostrará `redis: disabled`. |
+| `JWT_SECRET` | Obligatoria para `/auth/register` y `/auth/login` (mínimo 16 caracteres). Ver `.env.example`. |
+| `JWT_EXPIRE_MINUTES` | Opcional; validez del access token (por defecto 10080 = 7 días). |
+| `CORS_ORIGINS` | Opcional; URLs separadas por coma para el middleware CORS (front en Vercel, etc.). |
 
 ### 3. Base de datos con Docker Compose
 
@@ -67,6 +70,8 @@ Las listas de mensajes devuelven `{"items": [...], "next_before_id": ..., "limit
 
 | Método | Ruta | Descripción |
 |--------|------|-------------|
+| POST | `/auth/register` | Registro (mockup): nombre, username, email, teléfono, contraseña; devuelve JWT + usuario. |
+| POST | `/auth/login` | Inicio de sesión con email y contraseña; devuelve JWT + usuario. |
 | POST | `/usuarios` | Crear usuario (`nombre`). |
 | GET | `/usuarios` | Listar usuarios. |
 | GET | `/usuarios/{id}` | Obtener usuario por ObjectId. |

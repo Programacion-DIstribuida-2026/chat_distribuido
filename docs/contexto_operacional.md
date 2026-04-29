@@ -10,6 +10,8 @@ Guía breve para desarrollar y operar **Chat Distribuido** en local o en servido
 | `MONGO_HOST_PORT` | Solo Docker Compose | Puerto publicado en el host para Mongo (default **37117** en `docker-compose.yml`). |
 | `MONGO_DB_NAME` | Opcional | Nombre de la base de datos (default `chat_db`). Los tests (`pytest`) fijan `chat_test` en `tests/conftest.py` para no mezclar datos con desarrollo. |
 | `REDIS_URL` | **Recomendada en producción** | Sin ella, `/health` marca `redis: disabled` y el **Pub/Sub entre instancias de Uvicorn no funciona**; el tiempo real queda limitado a un solo proceso. |
+| `JWT_SECRET` | Para `/auth/*` | Mínimo 16 caracteres; sin ella los endpoints de auth responden `503`. |
+| `CORS_ORIGINS` | Opcional | Orígenes permitidos (coma); si falta, no se aplica `CORSMiddleware`. |
 
 ## Arranque típico (local)
 

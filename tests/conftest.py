@@ -36,7 +36,7 @@ from main import app  # noqa: E402
 
 @pytest_asyncio.fixture(scope="session")
 async def async_client(_wipe_test_database):
-    transport = httpx.ASGITransport(app=app, lifespan="on")
+    transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(
         transport=transport, base_url="http://test"
     ) as client:
