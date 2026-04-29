@@ -1,0 +1,100 @@
+---
+description: React Hook Form + Server Actions pattern. Client-side validation via zodResolver + server-side revalidation in the action.
+globs: ["src/**/*form*", "src/**/*.action.ts"]
+alwaysApply: false
+---
+
+# Forms Pattern (Risk 4: RHF + Server Actions)
+
+## The One Pattern
+
+```
+Client: RHF + zodResolver → client validation (UX)
+     ↓ valid
+Server Action → zod validate again (security) → business logic
+```
+
+Zod validates TWICE:
+1. Client-side: immediate UX feedback via RHF
+2. Server-side: never trust the client
+
+## Template
+```typescript
+// form.tsx (client)
+"use client";
+const schema = z.object({ email: z.string().email() });
+type FormValues = z.infer<typeof schema>;
+
+export function MyForm() {
+  const [state, formAction, isPending] = useActionState(myAction, { status: "idle" });
+  const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({
+    resolver: zodResolver(schema),
+  });
+
+  const onSubmit = handleSubmit((data) => {
+    const fd = new FormData();
+    Object.entries(data).forEach(([k, v]) => fd.set(k, String(v)));
+    formAction(fd);
+  });
+
+  return (
+    <form onSubmit={onSubmit}>
+      {state.status === "error" && <p role="alert">{state.message}</p>}
+      <input {...register("email")} />
+      {errors.email && <p>{errors.email.message}</p>}
+      <button disabled={isPending}>Submit</button>
+    </form>
+  );
+}
+
+// action.ts (server)
+"use server";
+const schema = z.object({ email: z.string().email() });
+
+export async function myAction(_prev: State, formData: FormData): Promise<State> {
+  const parsed = schema.safeParse({ email: formData.get("email") });
+  if (!parsed.success) return { status: "error", message: parsed.error.issues[0]?.message ?? "Invalid" };
+  // business logic...
+  redirect("/success");
+}
+```
+
+## Shared Schema
+
+Share the Zod schema between client and server from a single source (e.g., `lib/schemas.ts` or the Drizzle-generated schema via `drizzle-zod`) to avoid drift. The template above defines `schema` twice as an illustration — in production, import it from a shared module.
+
+## Toast Feedback
+
+> **⚠️ Toast calls belong in client components ONLY.** Never import `sonner` or call `toast()` inside a `"use server"` file. The server action returns `ActionResult`; the component reads the result and shows the toast.
+
+Every action that affects the database MUST show a toast to the user. No mutation should complete silently.
+
+- Use `toast.success(message)` for successful operations
+- Use `toast.error(message)` for failed operations
+- Import `toast` from `sonner`
+- Server actions that mutate data must return `ActionResult` from `@/shared/lib/action-result` (not `void`)
+- Exception: if the action redirects to another page on success, no success toast is needed (the user sees the new page)
+
+### Pattern A — Direct action call (button onClick, non-`useActionState` forms)
+```typescript
+import { toast } from "sonner";
+import type { ActionResult } from "@/shared/lib/action-result";
+
+startTransition(async () => {
+  const result = await myAction(id);
+  if (result.status === "success") toast.success(result.message);
+  else toast.error(result.message);
+});
+```
+
+### Pattern B — `useActionState` forms
+```typescript
+import { useEffect } from "react";
+import { toast } from "sonner";
+
+const [state, formAction] = useActionState(myAction, { status: "idle" });
+
+useEffect(() => {
+  if (state.status === "error") toast.error(state.message);
+}, [state]);
+```

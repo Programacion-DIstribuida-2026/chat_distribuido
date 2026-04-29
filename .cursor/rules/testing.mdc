@@ -1,0 +1,136 @@
+---
+description: TDD, Vitest, and Playwright testing standards.
+globs: ["**/*.test.*", "**/e2e/**"]
+alwaysApply: false
+---
+
+# Testing Standards
+
+## Iron Rules (Non-Negotiable)
+1. **NEVER modify a test to make it pass** — always fix the implementation code. Tests define the contract. If a test fails, the code is wrong, not the test.
+2. **Tests are immutable during GREEN phase** — only modify tests in RED phase (writing new ones) or REFACTOR phase (improving structure, never weakening assertions)
+3. **Coverage thresholds** — 95% statements/functions/lines, 90% branches. Use `/* v8 ignore next */` only for genuinely unreachable defensive branches
+4. **Every edge case gets a test** — null/undefined, empty string, empty array, boundary values, error responses, timeout, concurrent calls
+5. **AAA is mandatory** — every test uses Arrange-Act-Assert with labeled comments
+
+## TDD Cycle
+1. **RED**: Write failing test describing desired behavior
+2. **GREEN**: Write minimum code to make it pass
+3. **REFACTOR**: Clean up while keeping tests green
+
+## AAA Pattern (Arrange-Act-Assert)
+
+Every test MUST follow the Arrange-Act-Assert structure. No exceptions.
+
+```typescript
+it("shows error message on invalid credentials", async () => {
+  // Arrange
+  const user = userEvent.setup();
+  mockSignIn.mockResolvedValue({ error: { message: "Invalid credentials" } });
+  render(<LoginForm />);
+
+  // Act
+  await user.type(screen.getByLabelText(/email/i), "test@example.com");
+  await user.type(screen.getByLabelText(/password/i), "password123");
+  await user.click(screen.getByRole("button", { name: /sign in/i }));
+
+  // Assert
+  expect(await screen.findByRole("alert")).toHaveTextContent("Invalid credentials");
+});
+```
+
+Rules:
+- **Arrange**: set up state, mocks, render
+- **Act**: perform the single action being tested
+- **Assert**: verify outcome — one logical assertion per test
+- Add blank lines between sections when all three are non-trivial
+- Never skip a section — if Act is empty, you are testing the wrong thing
+
+## Vitest (Unit + Integration)
+- Mock external dependencies only (HTTP calls, Supabase, DB)
+- Test behavior, not implementation details
+- Colocate tests with source: `features/auth/__tests__/`
+- Coverage thresholds are non-negotiable (95% statements/functions/lines, 90% branches — see Iron Rule #3)
+
+```typescript
+// ✅ AAA — tests behavior
+it("shows error message on invalid credentials", async () => {
+  // Arrange
+  mockSignIn.mockResolvedValue({ error: { message: "Invalid credentials" } });
+  render(<LoginForm />);
+
+  // Act
+  await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+
+  // Assert
+  expect(await screen.findByRole("alert")).toBeInTheDocument();
+});
+
+// ❌ No AAA — tests implementation details, brittle
+it("calls signInWithPassword with correct args", () => { ... });
+```
+
+## Playwright (E2E)
+- **Always use `data-testid` attributes for element selection** — never use visible text or translated labels. Text-based selectors break when copy or i18n changes.
+- Page Object Pattern for complex flows
+- Every user flow needs an e2e test
+
+```typescript
+// ✅ Stable — decoupled from i18n
+await page.getByTestId("submit-button").click();
+
+// ❌ Brittle — breaks if language changes or copy is updated
+await page.getByRole("button", { name: /sign in/i }).click();
+await page.getByLabel(/email/i).fill("...");
+```
+
+```typescript
+test("user can log in", async ({ page }) => {
+  // Arrange
+  await page.goto("/login");
+
+  // Act
+  await page.getByTestId("email-input").fill("user@example.com");
+  await page.getByTestId("password-input").fill("password123");
+  await page.getByTestId("sign-in-button").click();
+
+  // Assert
+  await expect(page).toHaveURL("/");
+});
+```
+
+## Edge Case Checklist
+For every function, ask: what happens with...
+- null / undefined input
+- empty string / empty array / empty object
+- boundary values (0, -1, MAX_SAFE_INTEGER)
+- invalid types (wrong shape, missing fields)
+- API error responses (4xx, 5xx, network failure)
+- Loading / pending states
+- Concurrent calls / race conditions
+- Auth expired / missing session
+
+If any of these apply, write a test for it. No exceptions.
+
+## jsdom Known Limitations (avoid rework cycles)
+
+jsdom does not implement all browser APIs. Hitting these in tests causes failures that require full component rewrites — avoid them upfront:
+
+- **No `HTMLDialogElement` methods** — `dialog.showModal()` and `dialog.close()` throw in jsdom. Use state-controlled visibility (`isOpen` prop / conditional render) instead of the native `<dialog>` API.
+- **No portal-based components in unit tests** — components like `<Toaster>` (sonner), `<Tooltip>`, `<Popover>` render outside the React tree and are unreliable in jsdom. Exclude their wrapper files from coverage; test toast behavior indirectly via the action's `ActionResult`.
+- **Run `pnpm lint` before finishing** — do not leave lint errors to a separate pass. Fix inline as you go.
+
+## Coverage Thresholds
+```typescript
+// vitest.config.ts
+coverage: {
+  thresholds: {
+    branches: 90,
+    functions: 95,
+    lines: 95,
+    statements: 95,
+  },
+}
+```
+
+Use `/* v8 ignore next */` for genuinely unreachable defensive branches (e.g., exhaustive `switch` default arms, type narrowing guards that cannot be hit at runtime).

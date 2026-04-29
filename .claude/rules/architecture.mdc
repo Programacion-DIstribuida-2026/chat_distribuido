@@ -1,0 +1,48 @@
+---
+description: Feature-based architecture rules. Applies to all source files.
+alwaysApply: false
+globs: ["src/**"]
+---
+
+# Architecture Rules
+
+## Feature-Based Structure
+```
+features/
+└── <feature-name>/
+    ├── components/     # React components
+    ├── actions/        # Server Actions (*.action.ts)
+    ├── queries/        # Read queries — *.queries.ts (repository layer)
+    ├── hooks/          # React hooks (use-*.ts)
+    ├── api/            # Route handlers (route.ts)
+    ├── lib/            # Feature-specific utilities, schemas, and types
+    └── __tests__/      # Colocated tests
+```
+
+## Dependency Direction
+```
+features/* → shared/*   ✅
+shared/* → features/*   ❌ (circular dependency)
+features/a → features/b ❌ (cross-feature import)
+```
+
+If two features share logic, move it to `shared/`.
+
+## Layer Rules
+- `app/` — routing, layouts, RSC data fetching
+- `features/` — feature business logic, UI, actions
+- `shared/lib/` — infrastructure (supabase, ai, db)
+- `shared/components/` — design system components
+
+## Error Boundaries
+- Place at route level (`app/(protected)/layout.tsx`)
+- Never let unhandled errors propagate to root
+
+## Server Actions
+- File naming: `name.action.ts`
+- Always `"use server"` at top of file
+- Validate input with Zod before any business logic
+- Return typed result objects, use `redirect()` for navigation
+- Actions that mutate data must return `ActionResult` from `@/shared/lib/action-result` — never return `void`
+- The calling component is responsible for showing `toast.success()` / `toast.error()` based on the result
+- NEVER import or call client-only APIs inside server actions (`toast` from sonner, React hooks, `window`, `document`). Server actions run on the server where these APIs do not exist and will throw at runtime.

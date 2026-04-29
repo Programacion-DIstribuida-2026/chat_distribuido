@@ -1,0 +1,71 @@
+---
+description: Next.js 16.2 App Router patterns.
+globs: ["src/app/**"]
+alwaysApply: false
+---
+
+# Next.js 16.2 Rules
+
+## App Router Conventions
+- `page.tsx` — public route page component
+- `layout.tsx` — shared layout (wraps child pages)
+- `loading.tsx` — Suspense boundary UI
+- `error.tsx` — Error boundary UI
+- `route.ts` — API route handler
+- `proxy.ts` — Request proxy (project root, Node.js runtime). Intercepts and rewrites requests before they reach route handlers (e.g., session validation, redirects).
+
+## Route Groups
+- `(auth)` — unauthenticated routes
+- `(protected)` — authenticated routes with RSC auth check
+
+## Data Fetching in RSC
+```typescript
+// ✅ Async Server Component — fetch directly
+export default async function Page() {
+  const data = await fetchData(); // No useState, no useEffect
+  return <ClientComponent initialData={data} />;
+}
+```
+
+## Route Handler Patterns
+```typescript
+// app/api/*/route.ts
+export async function POST(request: Request) {
+  const body = await request.json() as unknown;
+  const parsed = schema.safeParse(body);
+  if (!parsed.success) return Response.json({ error: "Invalid input" }, { status: 400 });
+  // ...
+}
+```
+
+## Metadata
+```typescript
+export const metadata: Metadata = {
+  title: "Page Title",
+  description: "Page description",
+};
+```
+
+## Browser Log Forwarding
+
+Next.js 16.2 can forward browser logs to the terminal. Configure in `next.config.ts`:
+
+```typescript
+const nextConfig: NextConfig = {
+  logging: {
+    browserToTerminal: 'error', // 'error' (default) | 'warn' | true (all) | false (disabled)
+  },
+};
+```
+
+- `'error'` — forwards browser errors only (default)
+- `'warn'` — forwards errors and warnings
+- `true` — forwards all console output
+- `false` — disabled
+
+## Dev Server Lock File
+
+Next.js 16.2 writes `.next/dev/lock` when `next dev` starts. The file contains the PID, port, and URL of the running dev server.
+
+- Agents and scripts must check `.next/dev/lock` before starting `next dev` or `next build` to avoid duplicate processes.
+- If the lock file exists and the PID is still alive, attach to the existing server instead of starting a new one.

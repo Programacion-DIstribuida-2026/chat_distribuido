@@ -1,0 +1,108 @@
+---
+description: Security rules (OWASP, auth, RLS, XSS, CSP). Applied to server code, API routes, actions, auth, and config.
+globs: ["src/**/actions/**", "src/**/api/**", "src/**/lib/supabase/**", "src/app/**/route.ts", "src/app/**/proxy.ts", "*.config.*"]
+alwaysApply: false
+---
+
+# Security Rules
+
+## OWASP Top 10 Awareness
+1. **Injection** — use Drizzle parameterized queries, never string concatenation
+2. **Broken Auth** — Supabase Auth only, no custom auth
+3. **Sensitive Data** — HTTPS-only cookies, no secrets in code
+4. **XSS** — never use `dangerouslySetInnerHTML`, escape user input
+5. **Broken Access Control** — RLS on all tables, auth check in all protected routes
+6. **Security Misconfiguration** — CSP, HSTS, X-Frame-Options in `next.config.ts`
+7. **Insecure Dependencies** — run `pnpm audit` regularly
+8. **SSRF** — validate URLs before fetch
+
+## Environment Variables
+```
+NEXT_PUBLIC_*   → client-safe (Supabase URL, anon key only)
+No prefix       → server-only (DB URL, secret keys)
+```
+
+Never use `NEXT_PUBLIC_` for secret keys.
+
+## Supabase RLS
+- Enable RLS on EVERY table
+- Write explicit allow/deny policies
+- Test RLS policies — never assume they work
+
+## Auth in API Routes and Server Actions
+
+Every Server Action and API route that accesses data must verify auth via `getUser()` before any data access. RLS provides row-level enforcement, but `getUser()` at the action level is required as defense-in-depth — never rely on RLS alone.
+
+```typescript
+export async function POST(request: Request) {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  // ...
+}
+```
+
+Every mutation Server Action must:
+1. Call `getUser()` and return an error result if no user
+2. Scope all queries to `user.id` (even with RLS active)
+
+```typescript
+export async function deleteItemAction(id: string): Promise<ActionResult> {
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { status: "error", message: "No autenticado" };
+
+  const { error } = await supabase.from("items").delete().eq("id", id).eq("user_id", user.id);
+  if (error) return { status: "error", message: "Error al eliminar" };
+
+  revalidatePath("/");
+  return { status: "success", message: "Eliminado" };
+}
+```
+
+## Open Redirect Prevention
+
+Validate all redirect targets — ensure `next`/`redirect` params start with `/` and not `//`. Never redirect to user-controlled URLs without validation.
+
+```typescript
+// ✅ Safe redirect validation
+const next = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
+
+// ❌ Unsafe — allows protocol-relative redirects (//evil.com)
+const next = searchParams.get("next") ?? "/";
+```
+
+## Input Validation
+- Validate ALL external input with Zod at the boundary
+- Validate in Server Actions AND API routes
+- Never trust client-side validation alone
+
+## Rate Limiting
+- Apply rate limiting to all AI routes
+- Apply rate limiting to auth endpoints
+- Use Vercel's built-in rate limiting or `@upstash/ratelimit`
+
+## Content Security Policy
+
+`script-src` must not include `'unsafe-eval'`. Avoid `'unsafe-inline'` for scripts — prefer nonce-based CSP. `'unsafe-inline'` is acceptable for `style-src` only.
+
+```typescript
+// ✅ Ideal — nonce-based CSP (no unsafe-inline for scripts)
+`script-src 'self' 'nonce-${nonce}'`,
+"style-src 'self' 'unsafe-inline'",
+
+// ✅ Acceptable intermediate — add a TODO to migrate to nonce-based
+"script-src 'self' 'unsafe-inline'", // TODO: replace with nonce-based CSP
+"style-src 'self' 'unsafe-inline'",
+
+// ✅ Dev-only — unsafe-eval for React debugging features (silences installHook.js warning)
+`script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ""}`,
+
+// ❌ Never — unsafe-eval unconditionally in production
+"script-src 'self' 'unsafe-eval' 'unsafe-inline'",
+```
+
+## Cookies
+- `httpOnly: true` for auth tokens (Supabase handles this)
+- `secure: true` in production
+- `sameSite: "lax"` minimum

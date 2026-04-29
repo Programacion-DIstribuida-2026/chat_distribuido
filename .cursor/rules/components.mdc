@@ -1,0 +1,49 @@
+---
+description: shadcn/ui and Tailwind v4 component standards.
+globs: ["src/**/components/**"]
+alwaysApply: false
+---
+
+# Component Standards
+
+## shadcn/ui
+- Use shadcn/ui components from `@/shared/components/ui/`
+- Never build custom UI primitives when shadcn has one
+- Extend with `className` prop via `cn()` utility
+- New York style, CSS variables for theming
+
+## shadcn/ui (MCP + CLI)
+- **MCP tools** (preferred): `shadcn_search`, `shadcn_docs`, `shadcn_install`, `shadcn_diff`
+- Before writing component code, use `shadcn_docs <component>` to get up-to-date API and usage patterns
+- Use `shadcn_search <query>` to discover available components
+- Install components with `shadcn_install` or `shadcn add <component>` — never copy-paste component source manually
+- Use `shadcn_diff <component>` to check for upstream changes to already-installed components
+- The shadcn skill (`pnpm dlx skills add shadcn/ui`) is installed during scaffolding — provides project context automatically
+
+## Tailwind v4
+- CSS-native config via `@theme {}` in CSS
+- No `tailwind.config.js` — all config in `tailwind.css`
+- No inline styles, no CSS modules
+- Use Tailwind utility classes only
+
+## Design Tokens (Required)
+- Always use semantic token classes (`bg-primary`, `text-destructive`, `text-muted-foreground`, `border-border`, etc.)
+- Never use raw Tailwind palette colors (`bg-blue-500`, `text-gray-700`, `text-red-500`, etc.)
+- All colors must reference CSS variables defined in `@theme {}` in `tailwind.css`
+- Available semantic colors: primary, secondary, accent, destructive, success, warning, info, muted, background, foreground, border, input, ring
+- If a needed color does not exist as a token, add it to `@theme {}` in `tailwind.css` first
+
+## Accessibility (Required)
+- Semantic HTML elements (`<button>`, `<nav>`, `<main>`, etc.)
+- ARIA labels for interactive elements without visible text
+- Keyboard navigation support
+- Color contrast ratios (WCAG AA minimum)
+- `role="alert"` for error messages
+
+## Server vs Client Components
+- Default to Server Components (no `"use client"`)
+- Add `"use client"` only when you need:
+  - Event handlers (`onClick`, `onChange`, etc.)
+  - Hooks (`useState`, `useEffect`, etc.)
+  - Browser APIs
+- Keep Client Components small — push them to leaf nodes

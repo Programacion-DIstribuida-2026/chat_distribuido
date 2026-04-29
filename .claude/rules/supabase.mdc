@@ -1,0 +1,70 @@
+---
+description: Supabase + Drizzle rules. Schema changes require migration — never edit migration files directly.
+globs: ["src/shared/db/**", "src/shared/lib/supabase/**"]
+alwaysApply: false
+---
+
+# Supabase + Drizzle Rules (Risk 2: Zod Schema Drift)
+
+## Drizzle: Schema + Migrations ONLY
+```typescript
+// ✅ Use Drizzle for schema definition
+export const users = pgTable("users", {
+  id: uuid("id").primaryKey(),
+  email: text("email").notNull(),
+});
+
+// ✅ Auto-generate Zod from Drizzle — zero manual Zod for DB types
+export const insertUserSchema = createInsertSchema(users);
+export const selectUserSchema = createSelectSchema(users);
+
+// ❌ NEVER write Zod schemas manually for DB types
+const userSchema = z.object({ id: z.string(), email: z.string() }); // WRONG
+```
+
+## Runtime Reads: Repository Pattern (RLS active)
+
+All reads go through the feature's `queries/` module — never call `supabase.from().select()` inline in pages or actions.
+
+```typescript
+// ✅ Read via repository function
+import { getUserById } from "@/features/users/queries/users.queries";
+const { data, error } = await getUserById(supabase, userId);
+
+// ✅ Repository module — receives supabase client as parameter (DI)
+// src/features/users/queries/users.queries.ts
+import type { createClient } from "@/shared/lib/supabase/server";
+type Client = Awaited<ReturnType<typeof createClient>>;
+
+export async function getUserById(supabase: Client, userId: string) {
+  return supabase.from("users").select("*").eq("id", userId).single();
+}
+
+// ❌ Never inline a SELECT in a page or action
+const { data } = await supabase.from("users").select("*").eq("id", userId); // WRONG in page/action
+
+// ❌ Never use Drizzle for runtime queries
+const users = await db.select().from(usersTable); // WRONG — bypasses RLS
+```
+
+## RLS Mandate
+- Enable RLS on ALL tables in Supabase dashboard
+- Every table must have explicit policies — RLS is not a post-step
+- Default policy template: `CREATE POLICY "users_own_rows" ON <table> FOR ALL USING (user_id = auth.uid());`
+
+## Migrations
+
+Files in `src/shared/db/migrations/` are **auto-generated** by Drizzle CLI — never create, edit, or delete them directly.
+
+| Command | Purpose |
+|---|---|
+| `pnpm db:generate` | Generate migration SQL from schema changes |
+| `pnpm db:migrate` | Apply pending migrations to the database |
+| `pnpm db:push` | Push schema directly to DB (dev only, no migration file) |
+
+Workflow: edit `src/shared/db/<table>.schema.ts` → `pnpm db:generate` → review SQL → `pnpm db:migrate`
+
+## Environment Variables
+- `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` — client-safe, used in browser + server
+- `DATABASE_URL` — server-only, used by Drizzle for migrations (`drizzle.config.ts`)
+- See `.env.example` for all required variables

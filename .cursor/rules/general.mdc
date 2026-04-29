@@ -1,0 +1,54 @@
+---
+description: Stack overview and project conventions. Always loaded — defines the technology stack, project structure, and naming conventions for this project.
+alwaysApply: true
+---
+
+# Stack Overview
+
+## Technology Stack
+- **Framework**: Next.js 16.2 (App Router)
+- **Database**: Supabase (PostgreSQL) with Drizzle ORM for schema/migrations
+- **Auth**: Supabase Auth via `@supabase/ssr`
+- **ORM**: Drizzle + `drizzle-zod` (schema + migrations ONLY — no runtime queries)
+- **DB Runtime Queries**: `supabase-js` client (RLS active)
+- **Client State**: TanStack Query v5
+- **Validation**: Zod (auto-generated via `drizzle-zod`)
+- **Forms**: React Hook Form + Zod resolver
+- **UI**: shadcn/ui + Tailwind CSS v4 (shadcn skill installed for AI context)
+- **AI**: Vercel AI SDK + Google Gemini 2.0 Flash via AI Gateway
+- **Testing**: Vitest + React Testing Library + Playwright
+
+## Project Structure
+```
+src/
+├── app/               # Next.js App Router pages
+├── features/          # Feature modules (auth, chat)
+│   └── <feature>/
+│       ├── components/
+│       ├── actions/
+│       ├── queries/
+│       ├── hooks/
+│       ├── api/
+│       ├── lib/
+│       └── __tests__/
+├── shared/            # Shared across features
+│   ├── components/ui/ # shadcn/ui components
+│   ├── lib/           # supabase, ai, utilities
+│   └── db/            # Drizzle schema + migrations
+└── e2e/               # Playwright tests
+```
+
+## Naming Conventions
+- Files: `kebab-case.ts`
+- Components: `PascalCase`
+- Hooks: `useCamelCase`
+- Server Actions: `kebab-case.action.ts`
+- API Routes: `route.ts` (in feature `api/` folder)
+- Tests: `*.test.ts` or `*.test.tsx`
+- E2e: `*.spec.ts`
+
+## Import Ordering
+1. Node built-ins
+2. External packages
+3. Internal (`@/`)
+4. Relative (`./`, `../`)

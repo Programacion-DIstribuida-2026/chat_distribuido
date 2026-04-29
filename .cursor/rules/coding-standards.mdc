@@ -1,0 +1,120 @@
+---
+description: Code quality standards. Applies to TypeScript/TSX source files.
+alwaysApply: false
+globs: ["src/**/*.ts", "src/**/*.tsx"]
+---
+
+# Coding Standards
+
+## Absolute Rules
+- **Zero `any`** — use `unknown` + type guards or proper generics. `@typescript-eslint/no-explicit-any: error`
+- **Zero comments in production code** — code must be self-documenting through naming. Test AAA labels (`// Arrange`, `// Act`, `// Assert`) are required in tests.
+- **Zero magic numbers/strings** — use typed constants
+- **No `console.log`** in production code — `no-console: "error"`
+- **No `!` non-null assertions** — use proper null checks
+- **No `eslint-disable` inline comments** — fix the code instead. If a rule conflict is truly unavoidable (e.g. third-party API with no non-deprecated alternative), add a file-level override in `eslint.config.ts` with a `// TODO` comment explaining why.
+
+## AI Agent Lint Pre-Flight
+
+Before writing any code, internalize these rules. The project runs `eslint --max-warnings 0` — any violation blocks commits. These are the patterns that most commonly trip AI code generation:
+
+- **`no-console: "error"`** — never use `console.*` in production code. Use proper error handling (`throw`) or `ActionResult` error returns.
+- **`strict-boolean-expressions`** — never write `if (value)` for non-boolean types. Use explicit checks:
+  - `string`: `if (str !== "")`
+  - `number`: `if (n !== 0)`
+  - `T | null | undefined`: `if (value !== null && value !== undefined)`
+  - `T[]`: `if (array.length > 0)`
+  - JSX: `{condition !== null && condition !== undefined && <Component />}`
+- **`naming-convention`** — `camelCase` for variables/functions, `PascalCase` for types/interfaces/React components, `UPPER_CASE` allowed for constants. Never use `snake_case` except in `property` selectors (DB columns, JSON keys).
+- **`no-floating-promises`** — always `await` or prefix with `void` for fire-and-forget.
+- **`restrict-template-expressions`** — never interpolate non-string/number values directly: `` `${someObject}` `` → `` `${someObject.toString()}` ``.
+- **`no-unnecessary-condition`** — never check conditions that the type system proves always truthy/falsy.
+- **`no-unsafe-*`** — never pass `any`-typed values to typed parameters. Narrow with Zod or type guards first.
+
+> **Rule of thumb**: If unsure whether a pattern is valid, read `eslint.config.ts` before writing.
+
+## TDD
+
+Follow the RED → GREEN → REFACTOR cycle. See `testing.mdc` for the full rules and iron rules. Summary: never write implementation without a prior failing test.
+
+## SOLID Principles
+- **S**ingle Responsibility: one reason to change per module
+- **O**pen/Closed: extend behavior without modifying existing code
+- **L**iskov Substitution: subtypes must be substitutable for base types
+- **I**nterface Segregation: prefer small, focused interfaces
+- **D**ependency Inversion: depend on abstractions, not concretions
+
+## KISS & DRY
+- Simplest solution that works — no over-engineering
+- Three similar lines is better than a premature abstraction
+- Extract abstraction only when you have 3+ real use cases
+
+## Size Limits
+- Functions: max 20 lines
+- Files: max 200 lines
+- If exceeded, split by responsibility
+
+## Error Handling
+- Use `Result` types for expected failures
+- Never swallow errors silently
+- Always handle Promise rejections
+
+## Types
+- Prefer `interface` for object shapes (enforced by ESLint `consistent-type-definitions`). Use `type` for unions, intersections, and utility types.
+- Use `satisfies` for type-checked literals
+- Use `as const` for immutable literals
+- **Never use `as` type assertions for data from external sources** (DB, API, user input). Use Zod `.parse()` or `.safeParse()` to validate and type runtime data. `as const` is acceptable for literals.
+
+```typescript
+// ✅
+const schema = z.array(supportItemSchema);
+const items = schema.parse(data);
+
+// ❌
+const items = data as SupportListItem[];
+```
+
+## Language Rules
+
+- **Code-level text must be in English**: test `it()` descriptions, `describe()` block names, variable names, code comments, developer-facing `Error` constructor messages (never shown to users), `console` output
+- **User-facing text stays in the target language**: UI labels, placeholders, toast messages, form validation messages shown on screen, `ActionResult` error/success strings that end up displayed in the UI
+
+```typescript
+// ✅ Code-level: English
+it("returns error when candidate is not found", async () => { ... });
+throw new Error("Unexpected DB response shape"); // developer-facing, never shown in UI
+
+// ✅ User-facing: target language (Spanish)
+return { success: false, error: "Candidato no encontrado" }; // shown in toast
+toast.error("No se pudo guardar el cambio");
+
+// ❌ Wrong: code-level in wrong language
+it("retorna error si el candidato no existe", async () => { ... });
+```
+
+## Coverage Exclusions (configure upfront, not reactively)
+
+Before writing tests, add exclusions to `vitest.config.ts` for:
+- Drizzle schema definition files (`src/shared/db/*.schema.ts`)
+- Pure type files (files with only `type`/`interface` exports, no runtime logic)
+- Third-party UI wrapper components that rely on portals or browser APIs not supported in jsdom (e.g., `sonner.tsx`, toast providers)
+
+Configure these exclusions **before writing tests** to avoid reactive coverage fixes mid-implementation.
+
+```typescript
+// vitest.config.ts
+coverage: {
+  exclude: [
+    "src/shared/db/*.schema.ts",
+    "src/shared/components/ui/sonner.tsx",
+    // add other portal/type-only files here
+  ],
+}
+```
+
+## Pre-commit Quality Gates
+Every commit must pass two sequential gates:
+1. **lint-staged** — runs `eslint --max-warnings 0` on staged `.ts/.tsx` files. Any lint warning or error blocks the commit immediately (before the slower test suite runs).
+2. **Full test suite** — runs `vitest run --coverage` with 95% statement/function/line and 90% branch coverage required.
+
+Code that fails either gate cannot be committed.

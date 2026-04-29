@@ -83,8 +83,7 @@
 <body>
   <h1>Chat en tiempo real</h1>
   <p class="hint">
-    Cada persona usa <strong>su propio ID</strong> en “Mi ID” y el <strong>ID del otro</strong> en “Compañero”.
-    Ejemplo: Ana (id 1) pone 1 y 2; Beto (id 2) pone 2 y 1. Crea usuarios en <code>/docs</code> (POST /usuarios) y revisa IDs con GET /usuarios.
+    Los usuarios usan <strong>ObjectId de MongoDB</strong> (24 caracteres hexadecimales). Crea usuarios en <code>/docs</code> (<code>POST /usuarios</code>), copia el campo <code>id</code> de la respuesta y pégalo en “Mi ID” y “Compañero” según corresponda.
   </p>
   <p class="hint">
     <strong>Otro dispositivo en tu red:</strong> no uses <code>127.0.0.1</code> en su navegador (eso es “su propio equipo”). La otra persona debe entrar con la <strong>IP local de quien ejecuta el servidor</strong>, por ejemplo <code>http://192.168.0.15:9000/chat</code> (la IP la ves con <code>ip a</code>, <code>hostname -I</code> o en Windows <code>ipconfig</code>). El servidor debe arrancar con <code>uvicorn ... --host 0.0.0.0</code> y el firewall debe permitir el puerto 9000.
@@ -94,12 +93,12 @@
     <input id="serverHost" type="text" placeholder="vacío = usar esta misma página (ej. 192.168.0.15:9000 si no abriste desde esa IP)" autocomplete="off" />
     <div class="row">
       <div>
-        <label for="myId">Mi ID (usuario)</label>
-        <input id="myId" type="number" min="1" placeholder="1" />
+        <label for="myId">Mi ID (ObjectId 24 hex)</label>
+        <input id="myId" type="text" spellcheck="false" autocomplete="off" placeholder="674a1b2c3d4e5f60789a0bcd" />
       </div>
       <div>
-        <label for="peerId">ID del compañero</label>
-        <input id="peerId" type="number" min="1" placeholder="2" />
+        <label for="peerId">ID del compañero (ObjectId)</label>
+        <input id="peerId" type="text" spellcheck="false" autocomplete="off" placeholder="674a1b2c3d4e5f60789a0bce" />
       </div>
     </div>
     <div class="actions">
@@ -148,18 +147,26 @@
       log.scrollTop = log.scrollHeight;
     }
 
+    function normalizeOid(raw) {
+      return String(raw).trim().toLowerCase();
+    }
+
+    function isValidObjectId(s) {
+      return /^[0-9a-f]{24}$/.test(normalizeOid(s));
+    }
+
     function wsUrl() {
       const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const a = parseInt(String(myId.value), 10);
-      const b = parseInt(String(peerId.value), 10);
+      const a = encodeURIComponent(normalizeOid(myId.value));
+      const b = encodeURIComponent(normalizeOid(peerId.value));
       return `${proto}//${resolveServerAuthority()}/ws/chat/${a}/${b}`;
     }
 
     btnConnect.addEventListener('click', () => {
-      const a = parseInt(String(myId.value), 10);
-      const b = parseInt(String(peerId.value), 10);
-      if (!a || !b) {
-        setStatus('Indica Mi ID y ID del compañero (números válidos).', 'err');
+      const a = normalizeOid(myId.value);
+      const b = normalizeOid(peerId.value);
+      if (!isValidObjectId(a) || !isValidObjectId(b)) {
+        setStatus('Cada ID debe ser un ObjectId hexadecimal de 24 caracteres.', 'err');
         return;
       }
       if (a === b) {

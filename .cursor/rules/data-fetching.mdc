@@ -1,0 +1,115 @@
+---
+description: TanStack Query vs RSC data fetching boundaries. Applied when working on components, pages, queries, hooks, or actions.
+globs: ["src/**/components/**", "src/**/queries/**", "src/**/hooks/**", "src/**/actions/**", "src/app/**"]
+alwaysApply: false
+---
+
+# Data Fetching Rules (Risk 1: TanStack Query + RSC Boundary)
+
+## Hard Boundary
+
+| Use Case | Where |
+|---|---|
+| Initial page data | RSC `async` Server Component |
+| Background refresh / polling | TanStack Query |
+| User-triggered client reads | TanStack Query |
+| All mutations | Server Actions ONLY |
+
+**Never use TanStack Query mutations. Never use `useMutation`.**
+
+## WRONG ❌
+```typescript
+// ❌ Fetching initial data in a Client Component with TanStack Query
+"use client";
+export function UserProfile({ userId }: { userId: string }) {
+  const { data } = useQuery({
+    queryKey: ["user", userId],
+    queryFn: () => fetchUser(userId), // Initial data should come from RSC
+  });
+  return <div>{data?.name}</div>;
+}
+
+// ❌ Mutation with TanStack Query
+const mutation = useMutation({
+  mutationFn: (data) => updateUser(data), // Use Server Action instead
+});
+```
+
+## CORRECT ✅
+```typescript
+// ✅ Initial data from RSC via feature's queries/ module
+import { getUserById } from "@/features/users/queries/users.queries";
+
+export default async function UserPage({ params }: { params: { id: string } }) {
+  const supabase = await createClient();
+  const { data: user } = await getUserById(supabase, params.id); // via repository
+  return <UserProfile initialUser={user} />;
+}
+
+// ✅ TanStack Query for background refresh only
+// queryFn must call a function from the feature's queries/ module — never inline supabase.from() here
+"use client";
+export function UserProfile({ initialUser }: { initialUser: User }) {
+  const { data: user } = useQuery({
+    queryKey: ["user", initialUser.id],
+    queryFn: () => fetchUser(initialUser.id), // fetchUser lives in features/users/queries/
+    initialData: initialUser, // Seeded from RSC
+    staleTime: 5 * 60 * 1000,
+  });
+  return <div>{user.name}</div>;
+}
+
+// ✅ Mutation via Server Action
+async function updateUserAction(formData: FormData) {
+  "use server";
+  await db.update(users).set({ name: formData.get("name") });
+  revalidatePath("/profile");
+}
+```
+
+## Error Handling
+
+TanStack Query errors must be handled via the `error` property — never swallow them silently.
+
+- **Data queries** (background reads): show an inline error state in the component
+- **User-triggered actions**: show a toast via `sonner` (see `forms.mdc` Pattern A)
+
+```typescript
+"use client";
+export function UserProfile({ initialUser }: { initialUser: User }) {
+  const { data: user, error } = useQuery({
+    queryKey: ["user", initialUser.id],
+    queryFn: () => fetchUser(initialUser.id),
+    initialData: initialUser,
+  });
+
+  if (error) return <p role="alert">Failed to load user data.</p>;
+  return <div>{user.name}</div>;
+}
+```
+
+## Cache Invalidation After Server Actions
+
+After a Server Action mutates data, invalidate the relevant TanStack Query cache so the UI reflects the new state.
+
+```typescript
+// In the calling component (Client Component)
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+
+const queryClient = useQueryClient();
+
+startTransition(async () => {
+  const result = await updateUserAction(formData);
+  if (result.status === "success") {
+    // Invalidate cache so background queries re-fetch with fresh data
+    await queryClient.invalidateQueries({ queryKey: ["user", userId] });
+    toast.success(result.message);
+  } else {
+    toast.error(result.message);
+  }
+});
+```
+
+> **Note on optimistic updates**: Full optimistic updates use `onMutate` + rollback on failure (`onError`). Do not implement this pattern until you have a concrete use case — `invalidateQueries` is simpler and sufficient for most scenarios.
+
