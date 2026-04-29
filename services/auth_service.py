@@ -7,14 +7,14 @@ import re
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import bcrypt
 import jwt
-from passlib.context import CryptContext
 from pymongo.errors import DuplicateKeyError
 
 from database import db
 from models.schemas import RegistroUsuario
 
-_pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
+_BCRYPT_MAX = 72
 
 
 class AuthConflictError(Exception):
@@ -42,14 +42,22 @@ def _jwt_expire_minutes() -> int:
     return max(5, min(n, 525600))
 
 
+def _password_bytes(plain: str) -> bytes:
+    """bcrypt solo usa los primeros 72 bytes UTF-8."""
+    return plain.encode("utf-8")[:_BCRYPT_MAX]
+
+
 def _hash_password(plain: str) -> str:
-    return _pwd.hash(plain)
+    return bcrypt.hashpw(_password_bytes(plain), bcrypt.gensalt()).decode("ascii")
 
 
 def _verify_password(plain: str, hashed: str) -> bool:
     try:
-        return _pwd.verify(plain, hashed)
-    except ValueError:
+        return bcrypt.checkpw(
+            _password_bytes(plain),
+            hashed.encode("ascii"),
+        )
+    except (ValueError, TypeError):
         return False
 
 
