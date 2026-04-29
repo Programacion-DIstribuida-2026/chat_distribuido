@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 from core.realtime_listener import start_redis_listener_task, stop_redis_listener_task
 from core.redis_client import connect_redis, disconnect_redis, ping_redis
 from database import create_tables, mongo_ping
-from routes import auth, chat_ws_router, grupos, mensajes, realtime_ws, usuarios
+from routes import auth, chat_ws_router, contactos, grupos, mensajes, realtime_ws, usuarios
 
 
 @asynccontextmanager
@@ -47,6 +47,7 @@ if _cors:
         )
 
 app.include_router(auth.router)
+app.include_router(contactos.router)
 app.include_router(usuarios.router)
 app.include_router(grupos.router)
 app.include_router(mensajes.router)

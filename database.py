@@ -64,5 +64,9 @@ async def create_tables():
                 "telefono_e164": {"$exists": True, "$type": "string"}
             },
         )
+        await db.contactos.create_index(
+            [("owner_id", 1), ("telefono_e164", 1)], unique=True
+        )
+        await db.contactos.create_index([("owner_id", 1)])
     except Exception as e:
         print(f" Aviso: índices: {e}")

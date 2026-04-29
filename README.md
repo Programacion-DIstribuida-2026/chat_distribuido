@@ -77,6 +77,10 @@ Las listas de mensajes devuelven `{"items": [...], "next_before_id": ..., "limit
 | GET | `/usuarios/{id}` | Obtener usuario por ObjectId. |
 | PATCH | `/usuarios/{id}` | Actualizar `nombre`. |
 | DELETE | `/usuarios/{id}` | Borrar usuario y sus mensajes asociados (`204`). |
+| POST | `/usuarios/{owner_id}/contactos` | Añadir contacto (`nombre`, `codigo_pais`, `numero`). |
+| GET | `/usuarios/{owner_id}/contactos` | Listar agenda del usuario. |
+| PATCH | `/usuarios/{owner_id}/contactos/{contacto_id}` | Actualizar nombre y/o teléfono del contacto. |
+| DELETE | `/usuarios/{owner_id}/contactos/{contacto_id}` | Quitar contacto (`204`). |
 | POST | `/mensajes` | Enviar mensaje (`remitente_id`, `destinatario_id`, `contenido`). |
 | GET | `/mensajes` | Historial global paginado (`limit`, `before_id`). |
 | GET | `/mensajes/conversacion/{usuario_a}/{usuario_b}` | Mensajes 1:1 entre dos usuarios. |

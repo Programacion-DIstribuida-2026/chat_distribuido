@@ -54,6 +54,21 @@ CORS: si defines `CORS_ORIGINS` (URLs separadas por coma) en el servidor, se per
 
 ---
 
+## Contactos (agenda por usuario)
+
+Libreta de contactos del mockup **Nuevo contacto** (`nombre`, `codigo_pais`, `numero`). Cada fila pertenece a un `owner_id` (ObjectId del usuario). Misma normalización E.164 que en registro.
+
+**Nota de seguridad:** hoy cualquier cliente que conozca el `owner_id` puede crear/listar/actualizar/borrar contactos de esa agenda; en producción conviene exigir JWT y comprobar que `sub` coincida con `owner_id`.
+
+| Método | Ruta | Cuerpo / parámetros | Respuesta |
+|--------|------|---------------------|-----------|
+| POST | `/usuarios/{owner_id}/contactos` | `{"nombre","codigo_pais","numero"}` | `201`: documento con `_id`, `owner_id`, `nombre`, `telefono_e164`, `creado_en`. `404` si el propietario no existe; `409` si ese teléfono ya está en la agenda. |
+| GET | `/usuarios/{owner_id}/contactos` | — | Lista de contactos (más recientes primero). |
+| PATCH | `/usuarios/{owner_id}/contactos/{contacto_id}` | Al menos `nombre` o `codigo_pais`+`numero` (juntos). | `200`: documento actualizado. `404` si no existe o no es del `owner_id`; `409` si el nuevo teléfono ya está en la agenda. |
+| DELETE | `/usuarios/{owner_id}/contactos/{contacto_id}` | — | `204` si existía y pertenecía al `owner_id`; `404` si no. |
+
+---
+
 ## Mensajes (REST)
 
 | Método | Ruta | Query | Respuesta |
