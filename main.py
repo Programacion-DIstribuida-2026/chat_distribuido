@@ -35,16 +35,22 @@ app = FastAPI(
 )
 
 _cors = os.environ.get("CORS_ORIGINS", "").strip()
+
 if _cors:
-    _origins = [o.strip() for o in _cors.split(",") if o.strip()]
-    if _origins:
-        app.add_middleware(
-            CORSMiddleware,
-            allow_origins=_origins,
-            allow_credentials=True,
-            allow_methods=["*"],
-            allow_headers=["*"],
-        )
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ]
+    app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+    )
 
 app.include_router(auth.router)
 app.include_router(contactos.router)

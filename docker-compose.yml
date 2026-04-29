@@ -1,16 +1,18 @@
+version: "3.9"
+
 services:
   mongodb:
     image: mongo:7.0
     container_name: chat_mongo
     restart: unless-stopped
+    ports:
+      - "${MONGO_HOST_PORT:-37117}:27017"
     environment:
       MONGO_INITDB_ROOT_USERNAME: admin
       MONGO_INITDB_ROOT_PASSWORD: "123"
-    ports:
-      # Puerto del host configurable (.env junto a este archivo): si Docker da "expose 500", prueba otro o reinicia Docker/WSL.
-      - "${MONGO_HOST_PORT:-37117}:27017"
     volumes:
       - mongo_data:/data/db
+    command: ["mongod", "--auth"]
 
   mongo-express:
     image: mongo-express:1.0.2
@@ -20,6 +22,7 @@ services:
       - "8081:8081"
     environment:
       ME_CONFIG_MONGODB_SERVER: mongodb
+      ME_CONFIG_MONGODB_PORT: 27017
       ME_CONFIG_MONGODB_ADMINUSERNAME: admin
       ME_CONFIG_MONGODB_ADMINPASSWORD: "123"
       ME_CONFIG_BASICAUTH_USERNAME: admin
@@ -33,6 +36,7 @@ services:
     restart: unless-stopped
     ports:
       - "6379:6379"
+    command: ["redis-server", "--appendonly", "yes"]
 
 volumes:
   mongo_data:
